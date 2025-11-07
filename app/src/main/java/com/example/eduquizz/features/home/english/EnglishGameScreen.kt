@@ -1,0 +1,357 @@
+package com.example.eduquizz.features.home.english
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import com.example.eduquizz.R
+import com.example.quizapp.ui.theme.QuizAppTheme
+import com.example.eduquizz.data.models.Game
+import kotlinx.coroutines.delay
+
+@Composable
+fun EnglishGamesScreen(
+    onBackClick: () -> Unit = {},
+    onGameClick: (Game) -> Unit = {}
+) {
+
+    // System UI Controller for status bar
+    val systemUiController = rememberSystemUiController()
+
+    var showRipple by remember { mutableStateOf(false) }
+    var pendingGameClick by remember { mutableStateOf<Game?>(null) }
+
+    LaunchedEffect(Unit) {
+        systemUiController.setStatusBarColor(
+            color = Color(0xFF5A4FCF),
+            darkIcons = false
+        )
+    }
+
+    LaunchedEffect(showRipple) {
+        if (showRipple) {
+            delay(500)
+            pendingGameClick?.let { game ->
+                onGameClick(game)
+            }
+            showRipple = false
+        }
+    }
+
+
+    val games = listOf(
+        Game(
+            id = "word_find",
+            name = "Word Search",
+            iconRes = R.drawable.eng,
+            progress = 8,
+            totalQuestions = 550,
+            completedQuestions = 8,
+            totalLessons = 11,
+            gradientColors = listOf(
+                Color(0xFF4A85F5),
+                Color(0xFF7B61FF),
+                Color(0xFF7B61FF)
+            )
+        ),
+        Game(
+            id = "match_game",
+            name = "Match Game",
+            iconRes = R.drawable.eng,
+            progress = 3,
+            totalQuestions = 400,
+            completedQuestions = 3,
+            totalLessons = 8,
+            gradientColors = listOf(
+                Color(0xFFFF5722),
+                Color(0xFFFF9800),
+                Color(0xFFFFC107)
+            )
+        ),
+        Game(
+            id = "quiz",
+            name = "Quiz",
+            iconRes = R.drawable.eng,
+            progress = 23,
+            totalQuestions = 875,
+            completedQuestions = 23,
+            totalLessons = 12,
+            gradientColors = listOf(
+                Color(0xFF4ECDC4),
+                Color(0xFF44A08D),
+                Color(0xFF096A5A)
+            )
+        ),
+        Game(
+            id = "batchu",
+            name = "Bắt Chữ",
+            iconRes = R.drawable.eng,
+            progress = 15,
+            totalQuestions = 620,
+            completedQuestions = 15,
+            totalLessons = 10,
+            gradientColors = listOf(
+                Color(0xFFFF6B9D),
+                Color(0xFFFF8E9E),
+                Color(0xFFFFB4A2)
+            )
+        ),
+        Game(
+            id = "sound_game",
+            name = "Sound Guessing",
+            iconRes = R.drawable.eng,
+            progress = 0,
+            totalQuestions = 30,
+            completedQuestions = 0,
+            totalLessons = 3,
+            gradientColors = listOf(
+                Color(0xFF00C9FF),
+                Color(0xFF92FE9D)
+            )
+        )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF667EEA), // Blue Purple
+                        Color(0xFF764BA2)  // Purple
+                    )
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Header with modern gradient background
+            EnglishGamesHeader(
+                onBackClick = onBackClick
+            )
+
+            // Games list
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(vertical = 20.dp)
+            ) {
+                items(games) { game ->
+                    EnhancedGameCard(
+                        game = game,
+                        onClick = { onGameClick(game) }
+                    )
+                }
+            }
+        }
+
+        if (showRipple) {
+            FullscreenRippleEffect()
+        }
+    }
+}
+
+@Composable
+private fun FullscreenRippleEffect(){
+    val radius = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        radius.animateTo(
+            targetValue = 2000f,
+            animationSpec = tween(durationMillis = 500)
+        )
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                color = Color(0xFF4A85F5).copy(alpha = 0.6f),
+                radius = radius.value,
+                center = center
+            )
+        }
+    }
+}
+
+@Composable
+private fun EnglishGamesHeader(
+    onBackClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF667EEA), // Blue Purple
+                        Color(0xFF764BA2)  // Purple
+                    )
+                )
+            )
+            .padding(top = 48.dp, bottom = 24.dp, start = 16.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Back button with modern styling
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .background(
+                    Color.White.copy(alpha = 0.2f),
+                    RoundedCornerShape(12.dp)
+                )
+                .size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Quay lại",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column {
+            Text(
+                text = "Tiếng Anh",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "Chọn trò chơi yêu thích",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EnhancedGameCard(
+    game: Game,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        onClick = onClick
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = game.gradientColors,
+                        startX = 0f,
+                        endX = 800f
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icon hoặc chữ cái đại diện game
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.25f),
+                            RoundedCornerShape(20.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = game.name.first().toString(),
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(20.dp))
+
+                // Chỉ hiển thị tên game và tiến độ (nếu muốn giữ)
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = game.name,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    LinearProgressIndicator(
+                        progress = game.progress.toFloat() / game.totalQuestions.toFloat(),
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.3f)
+                    )
+                }
+
+                // Nút mũi tên
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.2f),
+                            RoundedCornerShape(18.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "→",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun EnglishGamesScreenPreview() {
+    QuizAppTheme {
+        EnglishGamesScreen()
+    }
+}

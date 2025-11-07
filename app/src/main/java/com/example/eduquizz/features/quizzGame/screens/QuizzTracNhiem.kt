@@ -1,0 +1,672 @@
+package com.example.eduquizz.features.quizzGame.screens
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.eduquizz.features.quizzGame.model.QuestionItem
+import com.example.eduquizz.features.quizzGame.viewmodel.QuestionViewModel
+import kotlinx.coroutines.delay
+import com.example.eduquizz.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.eduquizz.navigation.Routes
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import com.example.eduquizz.data_save.DataViewModel
+import com.example.eduquizz.features.home.screens.WithLoading
+import com.example.eduquizz.features.home.viewmodel.LoadingViewModel
+import com.example.eduquizz.data_save.AudioManager
+import androidx.compose.runtime.DisposableEffect
+
+@SuppressLint("SuspiciousIndentation")
+@Composable
+fun MainView(
+    currentLevel: String,
+    name: String,
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    questionViewModel: QuestionViewModel = hiltViewModel(),
+    dataViewModel: DataViewModel = hiltViewModel(),
+    loadingViewModel: LoadingViewModel = viewModel()
+) {
+    val loadingState by loadingViewModel.loadingState.collectAsState()
+    var isVisible by remember { mutableStateOf(false) }
+    var isDataLoaded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Khởi tạo game và lấy dữ liệu từ backend
+    LaunchedEffect(key1 = true) {
+        questionViewModel.Init(dataViewModel, currentLevel)
+        loadingViewModel.showLoading("Đang tải Quiz Game...", showProgress = true)
+        loadingViewModel.updateProgress(0.2f, "Đang tải câu hỏi...")
+        delay(600)
+        loadingViewModel.updateProgress(0.5f, "Đang chuẩn bị nội dung...")
+        delay(600)
+        loadingViewModel.updateProgress(0.8f, "Đang khởi tạo game...")
+        delay(400)
+        loadingViewModel.updateProgress(1.0f, "Hoàn thành!")
+        delay(200)
+        loadingViewModel.hideLoading()
+        isDataLoaded = true
+        isVisible = true
+    }
+
+    // Quan sát trạng thái dữ liệu từ ViewModel
+    val questionsState = questionViewModel.data.value
+    val count = questionViewModel.count
+    val score = questionViewModel.score
+    val choiceSelected = questionViewModel.choiceSelected
+    val resetTimeTrigger = questionViewModel.resetTimeTrigger
+    val usedQuestions = questionViewModel.usedQuestions
+    val usedHelperThisQuestion = questionViewModel.usedHelperThisQuestion
+    val showExpertDialog = questionViewModel.showExpertDialog
+    val choiceAttempts = questionViewModel.choiceAttempts
+    val gold by dataViewModel.gold.observeAsState(-1)
+    val hiddenChoices = questionViewModel.hiddenChoices
+    val helperCounts = questionViewModel.helperCounts
+    val showResultDialog = questionViewModel.showResultDialog
+    val expertAnswer = questionViewModel.expertAnswer
+    val twoTimeChoice = questionViewModel.twoTimeChoice
+    val coins = questionViewModel.coins
+
+    // Cập nhật coins từ DataViewModel
+    LaunchedEffect(gold) {
+        if (gold > -1 && coins.value == -1) {
+            coins.value = gold
+        }
+    }
+
+    // Xử lý lỗi từ backend
+    LaunchedEffect(questionsState) {
+        if (!questionsState.loading!! && questionsState.e != null) {
+            Toast.makeText(context, "Lỗi tải dữ liệu: ${questionsState.e?.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    WithLoading(
+        isLoading = loadingState.isLoading,
+        isDarkTheme = false,
+        backgroundColors = listOf(
+            Color(0xFF096A5A),
+            Color(0xFF44A08D),
+            Color(0xFF4ECDC4),
+            MaterialTheme.colorScheme.background
+        )
+    ) {}
+
+    if (!isDataLoaded) {
+        return
+    }
+
+    Scaffold(
+        topBar = {
+            IconButton(
+                onClick = {
+                    navController.popBackStack()
+                },
+                modifier = Modifier
+                    .padding(16.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.2f),
+                        RoundedCornerShape(12.dp)
+                    )
+                    .size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Quay lại",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        },
+        bottomBar = {
+            BottomHelperBar(
+                usedHelperThisQuestion = usedHelperThisQuestion.value,
+                coins = coins.value,
+                helperCounts = helperCounts,
+                onHelperClick = { index ->
+                    if (usedHelperThisQuestion.value) return@BottomHelperBar
+                    questionViewModel.ProcessHelperBar(index)
+                },
+                modifier = Modifier.fillMaxWidth().padding(8.dp)
+            )
+        },
+        modifier = Modifier.fillMaxSize()
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            TimerProgressBar(
+                resetTrigger = resetTimeTrigger.value,
+                isAnswered = choiceSelected.value.isNotEmpty(),
+                onTimeOut = {
+                    if (choiceSelected.value.isEmpty()) {
+                        choiceSelected.value = "timeout"
+                        usedHelperThisQuestion.value = true
+                        Toast.makeText(context, "Đã hết thời gian !!!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+
+            if (!questionsState.loading!! && usedQuestions.isNotEmpty() && count.value < usedQuestions.size) {
+                Spacer(modifier = Modifier.height(20.dp))
+                ScoreScreen(
+                    count = count,
+                    totalQuestion = usedQuestions.size,
+                    score = score
+                )
+                QuestionScreen(usedQuestions[count.value])
+                ChoiceScreen(
+                    twoTimeChoice = twoTimeChoice.value,
+                    count = count,
+                    questionItem = usedQuestions[count.value],
+                    choiceSelected = choiceSelected,
+                    score = score,
+                    choiceAttempts = choiceAttempts,
+                    hiddenChoice = hiddenChoices,
+                    totalQuestion = usedQuestions.size,
+                    onNext = {
+                        if (count.value >= usedQuestions.lastIndex) {
+                            val temp = usedQuestions.size
+                            val scoreTemp = score.value
+                            navController.navigate("result/$scoreTemp/$temp/${Routes.INTRO}/${Routes.QUIZ_LEVEL}")
+                        } else {
+                            count.value++
+                            choiceSelected.value = ""
+                            resetTimeTrigger.value++
+                            hiddenChoices.clear()
+                            usedHelperThisQuestion.value = false
+                            twoTimeChoice.value = false
+                            choiceAttempts.value = 0
+                        }
+                    }
+                )
+            } else if (!(questionsState.loading == true) && questionsState.e != null) {
+                Text(
+                    text = "Lỗi tải câu hỏi: ${questionsState.e?.message}",
+                    color = Color.Red,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+
+        if (showExpertDialog.value) {
+            AlertDialog(
+                onDismissRequest = { showExpertDialog.value = false },
+                title = { Text("Ý kiến chuyên gia") },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Image(
+                            painter = painterResource(id = R.drawable.chuyengiabig),
+                            contentDescription = "Expert",
+                            modifier = Modifier
+                                .size(150.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Đáp án của tổ tư vấn là ${expertAnswer.value} với tỉ lệ 80% là đúng.")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        AudioManager.playClickSfx()
+                        showExpertDialog.value = false
+                    }) {
+                        Text("Đóng")
+                    }
+                }
+            )
+        }
+
+        if (showResultDialog.value) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Quiz Complete!") },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Image(
+                            painter = painterResource(id = if (score.value >= 10) R.drawable.congratgif else R.drawable.betterluck),
+                            contentDescription = "Congrat",
+                            modifier = Modifier
+                                .size(150.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (score.value < 10) {
+                            Text("Try your best later")
+                        }
+                        Text("Your score is ${score.value}/${usedQuestions.size}")
+                        Text("You earned ${score.value * 10} coins!")
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            coins.value += score.value * 10
+                            dataViewModel.updateGold(coins.value)
+                            showResultDialog.value = false
+                            navController.navigate(Routes.INTRO)
+                        }
+                    ) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ScoreScreen(count: MutableState<Int>, totalQuestion: Int, score: MutableState<Int>) {
+    Row(
+        modifier = Modifier
+            .padding(10.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Question ${count.value + 1}",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF3949AB)
+            )
+            Text(
+                text = "/$totalQuestion",
+                fontSize = 20.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Score: ${score.value}",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF2E7D32),
+                modifier = Modifier.padding(end = 12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun BottomHelperBar(
+    modifier: Modifier = Modifier,
+    coins: Int,
+    helperCounts: List<Pair<Int, Int>>,
+    usedHelperThisQuestion: Boolean,
+    onHelperClick: (index: Int) -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(2.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(id = R.drawable.coinimg),
+                contentDescription = "Coin",
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = coins.toString(),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Black
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            helperCounts.forEachIndexed { index, (iconId, count) ->
+
+                val helperAlpha = if (usedHelperThisQuestion) 0.3f else 1f
+                !usedHelperThisQuestion
+
+                Box(
+                    modifier = Modifier
+                        .clickable(enabled = !usedHelperThisQuestion) { onHelperClick(index) }
+                        .padding(4.dp)
+                        .alpha(helperAlpha),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Color.White)
+                            .border(2.dp, Color.LightGray, RoundedCornerShape(25.dp))
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = iconId),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 8.dp, y = 8.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row {
+                            Text(
+                                text = "$count",
+                                fontSize = 15.sp,
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(1.dp))
+                            Image(
+                                painter = painterResource(id = R.drawable.coinimg),
+                                contentDescription = null,
+                                modifier = Modifier.size(23.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TimerProgressBar(
+    totalTime: Int = 30,
+    warningTime: Int = 10,
+    resetTrigger: Int = 0,
+    isAnswered: Boolean = false,
+    onTimeOut: () -> Unit = {},
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .height(6.dp)
+        .padding(horizontal = 0.dp)
+) {
+    var timeLeft by remember(resetTrigger) { mutableStateOf(totalTime) }
+    var progress by remember(resetTrigger) { mutableStateOf(1f) }
+
+    LaunchedEffect(resetTrigger, isAnswered) {
+        while (timeLeft > 0 && !isAnswered) {
+            delay(1000L)
+            timeLeft--
+            progress = timeLeft.toFloat() / totalTime.toFloat()
+        }
+        if (timeLeft <= 0 && !isAnswered) {
+            onTimeOut()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(100.dp))
+            .background(Color.LightGray)
+    ) {
+        LinearProgressIndicator(
+            progress = progress,
+            modifier = Modifier.fillMaxSize(),
+            color = if (timeLeft <= warningTime) Color.Red else Color(0xFF3F51B5),
+            trackColor = Color.Transparent
+        )
+    }
+}
+
+@Composable
+fun QuestionScreen(questionItem: QuestionItem) {
+    val scrollState = rememberScrollState()
+    val imageUrl = questionItem.image ?: ""
+
+    Column(
+        modifier = Modifier
+            .padding(10.dp)
+            .fillMaxWidth()
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (imageUrl.isNotBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "Question Image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        Text(
+            text = questionItem.questionText,
+            color = Color(0xFF1A237E),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun ChoiceScreen(
+    twoTimeChoice: Boolean = false,
+    count: MutableState<Int>,
+    totalQuestion: Int,
+    choiceAttempts: MutableState<Int>,
+    questionItem: QuestionItem,
+    choiceSelected: MutableState<String>,
+    score: MutableState<Int>,
+    hiddenChoice: List<String>,
+    context: Context = LocalContext.current,
+    onNext: () -> Unit
+) {
+    val wrongChoices = remember { mutableStateListOf<String>() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            questionItem.choices.forEachIndexed { index, choice ->
+                val isSelected = choice == choiceSelected.value
+                val isCorrect = if (choiceSelected.value.isNotEmpty()) {
+                    choice == questionItem.answer
+                } else null
+                val isHidden = hiddenChoice.contains(choice)
+                val isWrong = wrongChoices.contains(choice)
+
+                ChoiceButton(
+                    twoTimeChoice = twoTimeChoice,
+                    content = choice,
+                    isSelected = isSelected,
+                    isCorrectAnswer = isCorrect,
+                    isDisabled = isHidden || isWrong,
+                    showAnswer = choiceSelected.value.isNotEmpty(),
+                    stt = index + 1,
+                    onClick = {
+                        if (choiceSelected.value.isEmpty()) {
+                            if (choice == questionItem.answer) {
+                                choiceSelected.value = choice
+                                score.value += 10
+                            } else if (twoTimeChoice && choiceAttempts.value == 0) {
+                                wrongChoices.add(choice)
+                                choiceAttempts.value++
+                                Toast.makeText(
+                                    context,
+                                    "Đáp án không chính xác !! Bạn được chọn lại một lần nữa!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                choiceSelected.value = choice
+                                wrongChoices.add(choice)
+                            }
+                        } else if (choiceSelected.value == "timeout") {
+                            Toast.makeText(context, "Bạn đã hết thời gian !!!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        val colorBtn = if (count.value == totalQuestion - 1) {
+            ButtonDefaults.buttonColors(containerColor = Color(0xFF03A9F4))
+        } else {
+            ButtonDefaults.buttonColors(containerColor = Color(0xFFEC407A))
+        }
+
+        Button(
+            onClick = {
+                AudioManager.playClickSfx()
+                onNext()
+            },
+            shape = RoundedCornerShape(20.dp),
+            colors = colorBtn,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 0.dp)
+        ) {
+            val textNextQuestion = if (count.value == totalQuestion - 1) "Finish Test" else "Next"
+            Text(
+                text = textNextQuestion,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun ChoiceButton(
+    stt: Int,
+    twoTimeChoice: Boolean,
+    content: String,
+    isSelected: Boolean,
+    isCorrectAnswer: Boolean?,
+    showAnswer: Boolean,
+    isDisabled: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = when {
+        isSelected && isCorrectAnswer == true -> Color(0xFF4CAF50)
+        isSelected && isCorrectAnswer == false -> Color(0xFF9F3E35)
+        showAnswer && isCorrectAnswer == true -> Color(0xFF4CAF50)
+        else -> Color(0xFFF5F5F5)
+    }
+
+    val textColor = when {
+        isSelected || (showAnswer && isCorrectAnswer == true) -> Color.White
+        else -> Color.Black
+    }
+
+    val borderModifier = if (isSelected) {
+        Modifier.border(
+            width = 2.dp,
+            color = Color(0xFF6200EE),
+            shape = RoundedCornerShape(12.dp)
+        )
+    } else Modifier
+
+    Button(
+        onClick = {
+            AudioManager.playClickSfx()
+            onClick()
+        },
+        enabled = !isDisabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp, horizontal = 16.dp)
+            .then(borderModifier)
+            .shadow(4.dp, RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = backgroundColor,
+            contentColor = textColor,
+            disabledContainerColor = Color(0xFF9F3E35),
+            disabledContentColor = textColor
+        ),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        val prefix = when (stt) {
+            1 -> "A."
+            2 -> "B."
+            3 -> "C."
+            else -> "D."
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            Text(
+                text = prefix,
+                color = textColor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(
+                text = content,
+                color = textColor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Start
+            )
+        }
+    }
+}
