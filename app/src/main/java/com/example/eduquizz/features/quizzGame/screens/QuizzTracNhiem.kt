@@ -221,16 +221,28 @@ fun MainView(
                     modifier = Modifier.padding(16.dp)
                 )
             }
-        }
 
-        if (showExpertDialog.value) {
+        }
+        ExpertDialog(showExpertDialog, expertAnswer)
+        if (showResultDialog.value) {
+            ResultDialog(
+                showDialog = showResultDialog,
+                score = score.value,
+                totalQuestions = usedQuestions.size,
+                coins = coins,
+                dataViewModel = dataViewModel,
+                navController = navController
+            )
+        }
+/*        if (showExpertDialog.value) {
+            val expertPainter = remember { painterResource(id = R.drawable.chuyengiabig) }
             AlertDialog(
                 onDismissRequest = { showExpertDialog.value = false },
                 title = { Text("Ý kiến chuyên gia") },
                 text = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(
-                            painter = painterResource(id = R.drawable.chuyengiabig),
+                            painter = expertPainter,
                             contentDescription = "Expert",
                             modifier = Modifier
                                 .size(150.dp)
@@ -249,9 +261,9 @@ fun MainView(
                     }
                 }
             )
-        }
+        }*/
 
-        if (showResultDialog.value) {
+/*        if (showResultDialog.value) {
             AlertDialog(
                 onDismissRequest = {},
                 title = { Text("Quiz Complete!") },
@@ -285,10 +297,95 @@ fun MainView(
                     }
                 }
             )
-        }
+        }*/
     }
 }
+@Composable
+fun ResultDialog(
+    showDialog: MutableState<Boolean>,
+    score: Int,
+    totalQuestions: Int,
+    coins: MutableState<Int>,
+    dataViewModel: DataViewModel,
+    navController: NavController
+) {
+    if (!showDialog.value) return
 
+    // ✅ Chỉ tính toán id ảnh khi score thay đổi
+    val imageRes by remember(score) {
+        mutableStateOf(
+            if (score >= 10) R.drawable.congratgif else R.drawable.betterluck
+        )
+    }
+
+    // ✅ Gọi painterResource sau khi id đã được nhớ
+    val resultPainter = painterResource(id = imageRes)
+
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Quiz Complete!") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = resultPainter,
+                    contentDescription = "Result Image",
+                    modifier = Modifier
+                        .size(150.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (score < 10) Text("Try your best later!")
+                Text("Your score is $score / $totalQuestions")
+                Text("You earned ${score * 10} coins!")
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    coins.value += score * 10
+                    dataViewModel.updateGold(coins.value)
+                    showDialog.value = false
+                    navController.navigate(Routes.INTRO)
+                }
+            ) {
+                Text("OK")
+            }
+        }
+    )
+}
+
+
+@Composable
+fun ExpertDialog(showExpertDialog: MutableState<Boolean>, expertAnswer: MutableState<String>) {
+    if (showExpertDialog.value) {
+        val expertPainter = painterResource(id = R.drawable.chuyengiabig)
+        AlertDialog(
+            onDismissRequest = { showExpertDialog.value = false },
+            title = { Text("Ý kiến chuyên gia") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painter = expertPainter,
+                        contentDescription = "Expert",
+                        modifier = Modifier
+                            .size(150.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Đáp án của tổ tư vấn là ${expertAnswer.value} với tỉ lệ 80% là đúng.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    AudioManager.playClickSfx()
+                    showExpertDialog.value = false
+                }) {
+                    Text("Đóng")
+                }
+            }
+        )
+    }
+}
 @Composable
 fun ScoreScreen(count: MutableState<Int>, totalQuestion: Int, score: MutableState<Int>) {
     Row(

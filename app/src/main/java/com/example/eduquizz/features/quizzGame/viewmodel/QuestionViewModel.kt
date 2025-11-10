@@ -31,6 +31,7 @@ class QuestionViewModel @Inject constructor(
     var coins = mutableStateOf(-1)
         private set
     val hiddenChoices = mutableStateListOf<String>()
+    //val hiddenChoices = mutableStateOf(mutableSetOf<String>())
     val helperCounts = mutableStateListOf(
         R.drawable.nammuoi_vip to 15,
         R.drawable.exchange to 20,

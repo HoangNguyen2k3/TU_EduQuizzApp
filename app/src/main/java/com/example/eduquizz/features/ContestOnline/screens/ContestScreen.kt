@@ -1,5 +1,8 @@
 package com.example.eduquizz.features.contest.screens
 
+import android.content.Intent
+import android.content.IntentFilter
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +23,7 @@ import androidx.navigation.NavController
 import androidx.navigation.Navigation
 import com.example.eduquizz.data.models.Game
 import com.example.eduquizz.features.ContestOnline.ContestPrefs
+import com.example.eduquizz.features.ContestOnline.GamePauseReceiver
 import com.example.eduquizz.features.ContestOnline.Model.QuestionItemContest
 import com.example.eduquizz.features.contest.viewmodel.QuestionViewModelFromFirebase
 import com.example.eduquizz.navigation.Routes
@@ -45,12 +49,41 @@ fun ContestScreen(
     var showResult by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
+    var isPaused by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val receiver = remember {
+        GamePauseReceiver(
+            onPauseGame = { isPaused = true },
+            onResumeGame = { isPaused = false }
+        )
+    }
+    DisposableEffect(Unit) {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        context.registerReceiver(receiver, filter)
+
+        onDispose {
+            context.unregisterReceiver(receiver)
+        }
+    }
+
+    // Nếu game bị pause → hiển thị thông báo
+    if (isPaused) {
+        Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("⏸ Trò chơi đã tạm dừng", fontSize = 20.sp, color = Color.Red)
+        }
+    }
     LaunchedEffect(Unit) {
         viewModel.loadQuestions("English/QuizGame/LevelEasy")
     }
 
-    LaunchedEffect(uiState.questions.isNotEmpty()) {
+/*    LaunchedEffect(uiState.questions.isNotEmpty()) {
         if (uiState.questions.isNotEmpty()) {
             while (timeLeft > 0 && !showResult) {
                 delay(1000)
@@ -59,8 +92,20 @@ fun ContestScreen(
             showResult = true
             //saveResultToFirebase(userName, score)
         }
+    }*/
+    LaunchedEffect(uiState.questions.isNotEmpty()) {
+        if (uiState.questions.isNotEmpty()) {
+            while (timeLeft > 0 && !showResult) {
+                if (!isPaused) {      // ⏸ chỉ trừ thời gian khi không bị pause
+                    delay(1000)
+                    timeLeft -= 1
+                } else {
+                    delay(500) // tạm chờ kiểm tra lại sau nửa giây
+                }
+            }
+            showResult = true
+        }
     }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -277,7 +322,20 @@ fun ResultScreen(score: Int, onExit: () -> Unit) {
 /**
  * 🏆 Lưu kết quả lên Firebase để cập nhật BXH
  */
+private val leaderboardRef by lazy {
+    FirebaseDatabase.getInstance().getReference("Contest/Leaderboard")
+}
 private fun saveResultToFirebase(userName: String, score: Int) {
+    val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+    val entry = mapOf(
+        "name" to userName,
+        "score" to score,
+        "date" to today,
+        "timestamp" to System.currentTimeMillis()
+    )
+    leaderboardRef.push().setValue(entry)
+}
+/*private fun saveResultToFirebase(userName: String, score: Int) {
     val ref = FirebaseDatabase.getInstance().getReference("Contest/Leaderboard")
     val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
 
@@ -288,4 +346,4 @@ private fun saveResultToFirebase(userName: String, score: Int) {
         "timestamp" to System.currentTimeMillis()
     )
     ref.push().setValue(entry)
-}
+}*/

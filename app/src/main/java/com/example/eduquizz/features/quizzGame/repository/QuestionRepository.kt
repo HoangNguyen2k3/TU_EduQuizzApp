@@ -11,8 +11,38 @@ import javax.inject.Inject
 class QuestionRepository @Inject constructor(
     private val api: QuizGameApi
 ) {
+    private val cache = mutableMapOf<String, List<QuestionItem>>()
 
     suspend fun getQuizGameLevel(levelId: String): DataOrException<ArrayList<QuestionItem>, Boolean, Exception> {
+        cache[levelId]?.let {
+            return DataOrException(data = ArrayList(it), loading = false)
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = api.getQuizGameLevel(levelId)
+                if (response.isSuccessful) {
+                    response.body()?.let { levelData ->
+                        val questions = ArrayList(levelData.questions.map { backendQuestion ->
+                            QuestionItem(
+                                questionText = backendQuestion.question,
+                                answer = backendQuestion.answer,
+                                category = backendQuestion.category,
+                                choices = backendQuestion.choices
+                            )
+                        })
+                        cache[levelId] = questions // ✅ cache local
+                        DataOrException(data = questions, loading = false)
+                    } ?: DataOrException(data = null, loading = false, e = Exception("No data found"))
+                } else {
+                    DataOrException(data = null, loading = false, e = Exception("API Error: ${response.code()}"))
+                }
+            } catch (exception: Exception) {
+                DataOrException(data = null, loading = false, e = exception)
+            }
+        }
+    }
+
+/*    suspend fun getQuizGameLevel(levelId: String): DataOrException<ArrayList<QuestionItem>, Boolean, Exception> {
         return withContext(Dispatchers.IO) {
             try {
                 val response = api.getQuizGameLevel(levelId)
@@ -43,7 +73,7 @@ class QuestionRepository @Inject constructor(
                 DataOrException(data = null, loading = false, e = exception)
             }
         }
-    }
+    }*/
 
     suspend fun getAllQuestionQuizGame(path: String): DataOrException<ArrayList<QuestionItem>, Boolean, Exception> {
         // Map path thành levelId cho backend
