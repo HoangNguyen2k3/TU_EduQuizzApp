@@ -36,6 +36,8 @@ import com.example.eduquizz.features.ThongKe.ThongKe
 import com.example.eduquizz.features.home.components.FloatingMoodButton
 import com.example.quizapp.ui.theme.QuizAppTheme
 import com.example.eduquizz.features.chatbox.FloatingChatButton
+import com.example.eduquizz.features.loginreward.viewmodel.LoginRewardViewModel
+import com.example.eduquizz.features.loginreward.screens.LoginRewardDialogWrapper
 
 @Composable
 fun MainScreen(
@@ -47,6 +49,18 @@ fun MainScreen(
     dataviewModel: DataViewModel = hiltViewModel(),
     userViewModel: UserViewModel = hiltViewModel()
 ) {
+    // Login Reward ViewModel
+    val loginRewardViewModel: LoginRewardViewModel = hiltViewModel()
+    
+    // Kiểm tra login reward khi screen được hiển thị (chỉ 1 lần duy nhất)
+    var hasCheckedReward by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!hasCheckedReward) {
+            android.util.Log.d("MainScreen", "🔍 Kiểm tra login reward lần đầu (chỉ 1 lần)...")
+            hasCheckedReward = true
+            loginRewardViewModel.checkLoginReward()
+        }
+    }
     var selectedTab by remember { mutableIntStateOf(0) }
 
     val tabBackgroundColors = listOf(
@@ -206,6 +220,18 @@ fun MainScreen(
             }
             FloatingMoodButton()
             FloatingChatButton()
+            
+            // Login Reward Dialog
+            LoginRewardDialogWrapper(
+                viewModel = loginRewardViewModel,
+                onCoinReceived = { coinAmount ->
+                    // Cập nhật coin khi nhận reward
+                    android.util.Log.d("LoginReward", "💰 Đang cộng $coinAmount xu vào tài khoản...")
+                    dataviewModel.addGold(coinAmount)
+                    // Force recomposition bằng cách không làm gì cả - observeAsState sẽ tự động trigger
+                    android.util.Log.d("LoginReward", "✅ Đã gọi addGold, gold sẽ được cập nhật qua Flow")
+                }
+            )
         }
     }
 }
@@ -263,6 +289,13 @@ private fun BottomNavigationBar(
 @Composable
 private fun HeaderSection(dataviewModel: DataViewModel, userViewModel: UserViewModel) {
     val userName by dataviewModel.playerName.observeAsState("")
+    // Observe gold để tự động recompose khi gold thay đổi
+    val gold by dataviewModel.gold.observeAsState(initial = 0)
+    
+    // Debug: Log khi gold thay đổi
+    LaunchedEffect(gold) {
+        android.util.Log.d("MainScreen", "💰 Gold đã thay đổi: $gold")
+    }
 
     TopAppBar(
         title = {},
@@ -338,8 +371,7 @@ private fun HeaderSection(dataviewModel: DataViewModel, userViewModel: UserViewM
                         modifier = Modifier.size(30.dp)
                     )
                     Spacer(modifier = Modifier.width(dimensionResource(id = R.dimen.spacing_small)))
-                    dataviewModel.updateGold(1000)
-                    val gold by dataviewModel.gold.observeAsState(initial = 0)
+                    // Sử dụng gold đã observe ở trên
                     Text(
                         text = "$gold",
                         color = Color.White,

@@ -52,47 +52,23 @@ fun ContestScreen(
     var isPaused by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val receiver = remember {
-        GamePauseReceiver(
+    val receiver = remember { GamePauseReceiver(
             onPauseGame = { isPaused = true },
             onResumeGame = { isPaused = false }
-        )
-    }
+        ) }
     DisposableEffect(Unit) {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(Intent.ACTION_USER_PRESENT)
-        }
+            addAction(Intent.ACTION_USER_PRESENT) }
         context.registerReceiver(receiver, filter)
-
         onDispose {
-            context.unregisterReceiver(receiver)
-        }
-    }
-
-    // Nếu game bị pause → hiển thị thông báo
-    if (isPaused) {
-        Box(
+            context.unregisterReceiver(receiver) } }
+    if (isPaused) { Box(
             Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("⏸ Trò chơi đã tạm dừng", fontSize = 20.sp, color = Color.Red)
-        }
-    }
+            contentAlignment = Alignment.Center) {
+            Text("⏸ Trò chơi đã tạm dừng", fontSize = 20.sp, color = Color.Red) } }
     LaunchedEffect(Unit) {
-        viewModel.loadQuestions("English/QuizGame/LevelEasy")
-    }
-
-/*    LaunchedEffect(uiState.questions.isNotEmpty()) {
-        if (uiState.questions.isNotEmpty()) {
-            while (timeLeft > 0 && !showResult) {
-                delay(1000)
-                timeLeft -= 1
-            }
-            showResult = true
-            //saveResultToFirebase(userName, score)
-        }
-    }*/
+        viewModel.loadQuestions("English/QuizGame/LevelEasy") }
     LaunchedEffect(uiState.questions.isNotEmpty()) {
         if (uiState.questions.isNotEmpty()) {
             while (timeLeft > 0 && !showResult) {
